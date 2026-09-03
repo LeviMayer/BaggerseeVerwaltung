@@ -3,6 +3,8 @@
 Tkinter-Anwendung zur täglichen Erfassung und Auswertung der Betriebsdaten
 eines Baggersees.
 
+Repository: https://github.com/LeviMayer/BaggerseeVerwaltung
+
 ## Projektstruktur
 
 ```
@@ -12,8 +14,13 @@ BaggerseeVerwaltung/
     modelle.py                Datenmodell (Tagesdatensatz) + Validierung
     datenhaltung.py            CSV-Persistenz, CRUD (DatenManager)
     eingabe.py                  Eingabemaske (Erfassen/Bearbeiten/Löschen)
+    kalender.py                  Monatskalender-Widget
     auswertung.py                Zeitraumauswahl, Zusammenfassung, Tabs
     diagramme.py                 matplotlib-Diagrammfunktionen
+    stil.py                       Dunkles Farbschema (ttk-Style)
+    updater.py                    Auto-Update über GitHub Releases
+    version.py                    Versionsnummer der Anwendung
+  import_daten.py             Einmal-/Nachimport historischer CSV-Exporte
   requirements.txt
 ```
 
@@ -65,11 +72,40 @@ Systembibliotheken der Build-Maschine).
 
 ## Bedienung
 
-- **Erfassung**: links die Liste aller erfassten Tage, rechts das
-  Eingabeformular. "Neuer Eintrag" leert das Formular, ein Klick auf einen
-  Eintrag in der Liste lädt ihn zum Bearbeiten, "Löschen" entfernt den
-  ausgewählten Tag.
+- **Erfassung**: links der Monatskalender mit allen erfassten Tagen
+  (● vollständig, ● gelb = unvollständig, ○ kein Eintrag), rechts das
+  Eingabeformular. Ein Klick auf einen Tag im Kalender lädt ihn zum
+  Bearbeiten oder bereitet einen neuen Eintrag für diesen Tag vor.
 - **Auswertung**: Zeitraum frei wählen oder Schnellwahl nutzen
   (aktueller Monat / gesamte Saison / letztes Jahr). Die drei Unter-Reiter
   zeigen den gewählten Zeitraum im Detail, eine Monatsübersicht und eine
   Saisonübersicht über alle gespeicherten Daten.
+
+## Automatisches Update
+
+Die Anwendung prüft beim Start automatisch (und über den Knopf
+"Nach Updates suchen" in der Statusleiste) die
+[GitHub Releases](https://github.com/LeviMayer/BaggerseeVerwaltung/releases)
+dieses Repositories auf eine neuere Version. Ist eine .exe-Datei in der
+neuesten Release als Anhang vorhanden und ihre Versionsnummer höher als die
+aktuell installierte, wird gefragt, ob sie heruntergeladen und installiert
+werden soll. Der Austausch der laufenden .exe erfolgt über ein kleines
+Batch-Skript im Temp-Verzeichnis, das nach dem Beenden der Anwendung die
+neue Version an die Stelle der alten kopiert und sie neu startet.
+
+Das automatische Update funktioniert nur in der gebauten `.exe`, nicht beim
+Start aus dem Quellcode (`python main.py`).
+
+## Neues Release veröffentlichen
+
+1. Versionsnummer in `baggersee/version.py` erhöhen (z. B. `"1.1.0"`).
+2. Änderungen committen und pushen.
+3. .exe bauen (siehe oben, mit `--collect-all matplotlib`).
+4. Release mit der GitHub CLI veröffentlichen:
+
+   ```
+   gh release create v1.1.0 dist/BaggerseeVerwaltung.exe --title "v1.1.0" --notes "Was ist neu..."
+   ```
+
+Die Versionsnummer im Tag/Release (`v1.1.0`) muss zur `VERSION` in
+`baggersee/version.py` passen, damit der Auto-Updater sie korrekt erkennt.
