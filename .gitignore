@@ -1,0 +1,14 @@
+# Echte Betriebsdaten – nicht ins (öffentliche) Repository
+baggersee_daten.csv
+baggersee_daten.csv.bak*
+Baggersee_Tagesdaten_Import.csv
+Baggersee_Tagesdaten_Import.xlsx
+
+# Python
+__pycache__/
+*.pyc
+
+# PyInstaller-Build-Ausgabe
+build/
+dist/
+*.spec
