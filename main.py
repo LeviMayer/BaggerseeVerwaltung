@@ -31,6 +31,11 @@ class BaggerseeApp(tk.Tk):
 
         self.datenmanager = DatenManager()
 
+        # Statusleiste zuerst packen (side="bottom"), damit ihr die volle
+        # Breite unten reserviert bleibt, bevor das Notebook mit
+        # expand=True den restlichen Platz beansprucht.
+        self._statusleiste_aufbauen()
+
         notebook = ttk.Notebook(self)
         notebook.pack(fill="both", expand=True)
 
@@ -46,7 +51,6 @@ class BaggerseeApp(tk.Tk):
         notebook.bind("<<NotebookTabChanged>>", self._tab_gewechselt)
         self._notebook = notebook
 
-        self._statusleiste_aufbauen()
         self.after(1500, lambda: self._update_pruefen(manuell=False))
 
     def _tab_gewechselt(self, _event=None) -> None:
