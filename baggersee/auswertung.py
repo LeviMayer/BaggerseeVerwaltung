@@ -15,7 +15,7 @@ import tkinter as tk
 from datetime import date
 from tkinter import messagebox, ttk
 
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 
 from . import stil
@@ -51,6 +51,27 @@ class AuswertungFrame(ttk.Frame):
         self._auswerten()
         self._monatsuebersicht_aktualisieren()
         self._saisonuebersicht_aktualisieren()
+
+    # ---------- Gemeinsamer Aufbau: Diagramm-Canvas mit Zoom/Pan-Toolbar ----------
+
+    def _canvas_mit_toolbar_einbetten(self, figur: Figure, parent: tk.Widget) -> FigureCanvasTkAgg:
+        """Bettet eine Figure inklusive Navigations-Toolbar (Zoom/Pan/Speichern) ein.
+
+        Die Toolbar wird bewusst VOR dem Canvas gepackt: Der Canvas nutzt
+        fill="both", expand=True und würde sonst bereits den gesamten Platz
+        beanspruchen, sodass für die darunterliegende Toolbar keiner mehr
+        übrig bliebe (siehe die Statusleiste in main.py für denselben Fall).
+        """
+        canvas = FigureCanvasTkAgg(figur, master=parent)
+        canvas.get_tk_widget().configure(bg=stil.HINTERGRUND, highlightthickness=0)
+
+        toolbar = NavigationToolbar2Tk(canvas, parent, pack_toolbar=False)
+        toolbar.update()
+        stil.dunkle_toolbar(toolbar)
+        toolbar.pack(side="bottom", fill="x")
+
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+        return canvas
 
     # ---------- Zeitraum-Leiste ----------
 
@@ -119,9 +140,7 @@ class AuswertungFrame(ttk.Frame):
         self.achse_einnahmen = self.figur_zeitraum.add_subplot(3, 1, 3)
         self.figur_zeitraum.tight_layout(pad=3.0)
 
-        self.canvas_zeitraum = FigureCanvasTkAgg(self.figur_zeitraum, master=self.tab_zeitraum)
-        self.canvas_zeitraum.get_tk_widget().configure(bg=stil.HINTERGRUND, highlightthickness=0)
-        self.canvas_zeitraum.get_tk_widget().pack(fill="both", expand=True)
+        self.canvas_zeitraum = self._canvas_mit_toolbar_einbetten(self.figur_zeitraum, self.tab_zeitraum)
 
     def _auswerten(self) -> None:
         try:
@@ -183,9 +202,7 @@ class AuswertungFrame(ttk.Frame):
         self.achse_monat_einnahmen = self.figur_monat.add_subplot(2, 1, 2)
         self.figur_monat.tight_layout(pad=3.0)
 
-        self.canvas_monat = FigureCanvasTkAgg(self.figur_monat, master=self.tab_monat)
-        self.canvas_monat.get_tk_widget().configure(bg=stil.HINTERGRUND, highlightthickness=0)
-        self.canvas_monat.get_tk_widget().pack(fill="both", expand=True)
+        self.canvas_monat = self._canvas_mit_toolbar_einbetten(self.figur_monat, self.tab_monat)
 
     def _monatsuebersicht_aktualisieren(self) -> None:
         alle = self.datenmanager.alle_eintraege()
@@ -204,9 +221,7 @@ class AuswertungFrame(ttk.Frame):
         self.achse_saison_einnahmen = self.figur_saison.add_subplot(2, 1, 2)
         self.figur_saison.tight_layout(pad=3.0)
 
-        self.canvas_saison = FigureCanvasTkAgg(self.figur_saison, master=self.tab_saison)
-        self.canvas_saison.get_tk_widget().configure(bg=stil.HINTERGRUND, highlightthickness=0)
-        self.canvas_saison.get_tk_widget().pack(fill="both", expand=True)
+        self.canvas_saison = self._canvas_mit_toolbar_einbetten(self.figur_saison, self.tab_saison)
 
     def _saisonuebersicht_aktualisieren(self) -> None:
         alle = self.datenmanager.alle_eintraege()

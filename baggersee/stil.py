@@ -156,3 +156,16 @@ def _dunkler_titelbalken(root: tk.Tk) -> None:
             pass
 
     root.after(50, _setzen)
+
+
+def dunkle_toolbar(toolbar: tk.Widget) -> None:
+    """Färbt eine matplotlib NavigationToolbar2Tk (klassische Tk-Widgets, kein
+    ttk) passend zum dunklen Farbschema ein."""
+    toolbar.configure(bg=PANEL)
+    for kind in toolbar.winfo_children():
+        try:
+            kind.configure(bg=PANEL)
+        except tk.TclError:
+            continue
+        if isinstance(kind, tk.Label):
+            kind.configure(fg=SEKUNDAER)

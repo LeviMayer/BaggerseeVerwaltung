@@ -78,14 +78,16 @@ def importiere(pfad: Path) -> None:
             wassertemp = _temperatur(zeile.get("Wassertemperatur_max_C"), "Wassertemperatur", datum_text, warnungen)
             lufttemp = _temperatur(zeile.get("Lufttemperatur_max_C"), "Lufttemperatur", datum_text, warnungen)
 
+            von, bis = _text(zeile.get("Oeffnung_von")), _text(zeile.get("Oeffnung_bis"))
+            zeitraeume = [(von, bis)] if von and bis else []
+
             datensatz = Tagesdatensatz(
                 datum=datum,
                 besucher=besucher,
                 wassertemperatur=wassertemp,
                 lufttemperatur=lufttemp,
                 einnahmen=einnahmen,
-                oeffnung_von=_text(zeile.get("Oeffnung_von")),
-                oeffnung_bis=_text(zeile.get("Oeffnung_bis")),
+                oeffnungszeiten=zeitraeume,
             )
             dm.speichern(datensatz, ist_neu=False)
             importiert += 1

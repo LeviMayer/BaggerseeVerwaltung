@@ -81,15 +81,15 @@ class EingabeFrame(ttk.Frame):
         rahmen.grid(row=0, column=1, sticky="n")
 
         self.eingabe_datum = self._formularfeld(rahmen, 0, "Datum (TT.MM.JJJJ):")
-        self.eingabe_besucher = self._formularfeld(rahmen, 1, "Besucherzahl:")
-        self.eingabe_wassertemp = self._formularfeld(rahmen, 2, "Wassertemperatur (°C):")
+        self.eingabe_einnahmen = self._formularfeld(rahmen, 1, "Betrag / Einnahmen (€):")
+        self.eingabe_besucher = self._formularfeld(rahmen, 2, "Besucherzahl:")
         self.eingabe_lufttemp = self._formularfeld(rahmen, 3, "Lufttemperatur (°C):")
-        self.eingabe_einnahmen = self._formularfeld(rahmen, 4, "Einnahmen (€):")
-        self.eingabe_von = self._formularfeld(rahmen, 5, "Öffnung von (HH:MM):")
-        self.eingabe_bis = self._formularfeld(rahmen, 6, "Öffnung bis (HH:MM):")
+        self.eingabe_wassertemp = self._formularfeld(rahmen, 4, "Wassertemperatur (°C):")
+
+        self._oeffnungszeiten_aufbauen(rahmen, zeile=5)
 
         knopf_rahmen = ttk.Frame(rahmen)
-        knopf_rahmen.grid(row=7, column=0, columnspan=2, pady=(12, 0), sticky="ew")
+        knopf_rahmen.grid(row=6, column=0, columnspan=2, pady=(12, 0), sticky="ew")
 
         ttk.Button(knopf_rahmen, text="Neuer Eintrag", command=self.formular_leeren).pack(
             side="left", padx=2
@@ -102,13 +102,70 @@ class EingabeFrame(ttk.Frame):
         )
 
         self.status_label = ttk.Label(rahmen, style="Fehler.TLabel", text="", wraplength=260)
-        self.status_label.grid(row=8, column=0, columnspan=2, pady=(8, 0), sticky="w")
+        self.status_label.grid(row=7, column=0, columnspan=2, pady=(8, 0), sticky="w")
 
     def _formularfeld(self, parent: tk.Widget, zeile: int, beschriftung: str) -> ttk.Entry:
         ttk.Label(parent, text=beschriftung).grid(row=zeile, column=0, sticky="w", pady=3)
         eingabe = ttk.Entry(parent, width=22)
         eingabe.grid(row=zeile, column=1, sticky="w", pady=3, padx=(6, 0))
         return eingabe
+
+    def _oeffnungszeiten_aufbauen(self, parent: tk.Widget, zeile: int) -> None:
+        """Baut den Bereich für (mehrere) Öffnungszeiträume je Tag auf.
+
+        Ermöglicht z.B. bei einer Zwangspause wegen schlechten Wetters, einen
+        zweiten Zeitraum (nach der Wiedereröffnung) zu erfassen.
+        """
+        ttk.Label(parent, text="Öffnungszeiten (HH:MM):").grid(
+            row=zeile, column=0, sticky="nw", pady=3
+        )
+
+        wrapper = ttk.Frame(parent)
+        wrapper.grid(row=zeile, column=1, sticky="w", pady=3, padx=(6, 0))
+
+        self.oeff_container = ttk.Frame(wrapper)
+        self.oeff_container.pack(anchor="w")
+        self.zeitraum_zeilen: list[tuple[ttk.Frame, ttk.Entry, ttk.Entry]] = []
+
+        ttk.Button(
+            wrapper, text="+ Zeitraum hinzufügen", command=lambda: self._zeitraum_zeile_hinzufuegen()
+        ).pack(anchor="w", pady=(4, 0))
+
+    def _zeitraum_zeile_hinzufuegen(self, von: str = "", bis: str = "") -> None:
+        zeile = ttk.Frame(self.oeff_container)
+        zeile.pack(anchor="w", pady=2)
+
+        von_eingabe = ttk.Entry(zeile, width=7)
+        von_eingabe.insert(0, von)
+        von_eingabe.pack(side="left")
+
+        ttk.Label(zeile, text=" – ").pack(side="left")
+
+        bis_eingabe = ttk.Entry(zeile, width=7)
+        bis_eingabe.insert(0, bis)
+        bis_eingabe.pack(side="left")
+
+        ttk.Button(
+            zeile, text="×", width=2, command=lambda: self._zeitraum_zeile_entfernen(zeile)
+        ).pack(side="left", padx=(6, 0))
+
+        self.zeitraum_zeilen.append((zeile, von_eingabe, bis_eingabe))
+
+    def _zeitraum_zeile_entfernen(self, zeile: ttk.Frame) -> None:
+        self.zeitraum_zeilen = [z for z in self.zeitraum_zeilen if z[0] is not zeile]
+        zeile.destroy()
+        if not self.zeitraum_zeilen:
+            self._zeitraum_zeile_hinzufuegen()
+
+    def _zeitraeume_zuruecksetzen(self, zeitraeume: list[tuple[str, str]]) -> None:
+        for zeile, _, _ in list(self.zeitraum_zeilen):
+            zeile.destroy()
+        self.zeitraum_zeilen = []
+        if zeitraeume:
+            for von, bis in zeitraeume:
+                self._zeitraum_zeile_hinzufuegen(von, bis)
+        else:
+            self._zeitraum_zeile_hinzufuegen()
 
     # ---------- Verhalten ----------
 
@@ -121,11 +178,10 @@ class EingabeFrame(ttk.Frame):
             self.eingabe_wassertemp,
             self.eingabe_lufttemp,
             self.eingabe_einnahmen,
-            self.eingabe_von,
-            self.eingabe_bis,
         ):
             feld.delete(0, tk.END)
         self.eingabe_datum.insert(0, formatiere_datum(date.today()))
+        self._zeitraeume_zuruecksetzen([])
         self.status_label.config(text="")
 
     def _tag_ausgewaehlt(self, tag: date) -> None:
@@ -140,28 +196,27 @@ class EingabeFrame(ttk.Frame):
 
         felder_werte = [
             (self.eingabe_datum, formatiere_datum(e.datum)),
+            (self.eingabe_einnahmen, _formatiere_zahl(e.einnahmen)),
             (self.eingabe_besucher, str(e.besucher)),
-            (self.eingabe_wassertemp, _formatiere_zahl(e.wassertemperatur)),
             (self.eingabe_lufttemp, _formatiere_zahl(e.lufttemperatur)),
-            (self.eingabe_einnahmen, str(e.einnahmen)),
-            (self.eingabe_von, e.oeffnung_von),
-            (self.eingabe_bis, e.oeffnung_bis),
+            (self.eingabe_wassertemp, _formatiere_zahl(e.wassertemperatur)),
         ]
         for feld, wert in felder_werte:
             feld.delete(0, tk.END)
             feld.insert(0, wert)
+        self._zeitraeume_zuruecksetzen(e.oeffnungszeiten)
         self.status_label.config(text="")
 
     def _speichern(self) -> None:
+        zeitraum_texte = [(v.get(), b.get()) for _, v, b in self.zeitraum_zeilen]
         try:
             datensatz = erstelle_tagesdatensatz(
                 self.eingabe_datum.get(),
-                self.eingabe_besucher.get(),
-                self.eingabe_wassertemp.get(),
-                self.eingabe_lufttemp.get(),
                 self.eingabe_einnahmen.get(),
-                self.eingabe_von.get(),
-                self.eingabe_bis.get(),
+                self.eingabe_besucher.get(),
+                self.eingabe_lufttemp.get(),
+                self.eingabe_wassertemp.get(),
+                zeitraum_texte,
             )
         except ValidierungsFehler as fehler:
             self.status_label.config(text=str(fehler))

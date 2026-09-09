@@ -76,10 +76,20 @@ Systembibliotheken der Build-Maschine).
   (● vollständig, ● gelb = unvollständig, ○ kein Eintrag), rechts das
   Eingabeformular. Ein Klick auf einen Tag im Kalender lädt ihn zum
   Bearbeiten oder bereitet einen neuen Eintrag für diesen Tag vor.
+  - Feldreihenfolge: Datum, Betrag/Einnahmen, Besucherzahl, Lufttemperatur,
+    Wassertemperatur, Öffnungszeiten.
+  - Betrag, Temperaturen und Öffnungszeiten dürfen leer bleiben, wenn sie
+    noch nicht bekannt sind – der Tag gilt dann als unvollständig (gelb im
+    Kalender). Nur Datum und Besucherzahl sind Pflichtfelder.
+  - Über "+ Zeitraum hinzufügen" lassen sich mehrere Öffnungszeiträume je
+    Tag erfassen, z.B. bei einer Zwangspause wegen schlechten Wetters
+    (10:00–14:00 und 16:00–19:00).
 - **Auswertung**: Zeitraum frei wählen oder Schnellwahl nutzen
   (aktueller Monat / gesamte Saison / letztes Jahr). Die drei Unter-Reiter
   zeigen den gewählten Zeitraum im Detail, eine Monatsübersicht und eine
-  Saisonübersicht über alle gespeicherten Daten.
+  Saisonübersicht über alle gespeicherten Daten. Jedes Diagramm hat eine
+  Zoom-/Pan-Werkzeugleiste und zeigt beim Überfahren mit der Maus den
+  genauen Wert als Tooltip an.
 
 ## Automatisches Update
 

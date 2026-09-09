@@ -23,9 +23,27 @@ CSV_SPALTEN = [
     "wassertemperatur",
     "lufttemperatur",
     "einnahmen",
-    "oeffnung_von",
-    "oeffnung_bis",
+    "oeffnungszeiten",
 ]
+
+ZEITRAUM_TRENNER = "|"
+VON_BIS_TRENNER = "-"
+
+
+def _oeffnungszeiten_kodieren(zeitraeume: list[tuple[str, str]]) -> str:
+    return ZEITRAUM_TRENNER.join(f"{von}{VON_BIS_TRENNER}{bis}" for von, bis in zeitraeume)
+
+
+def _oeffnungszeiten_dekodieren(text: str) -> list[tuple[str, str]]:
+    text = text.strip()
+    if not text:
+        return []
+    zeitraeume = []
+    for teil in text.split(ZEITRAUM_TRENNER):
+        von, _, bis = teil.partition(VON_BIS_TRENNER)
+        if von and bis:
+            zeitraeume.append((von, bis))
+    return zeitraeume
 
 
 def basisverzeichnis() -> Path:
@@ -61,14 +79,20 @@ class DatenManager:
             reader = csv.DictReader(f, delimiter=";")
             for zeile in reader:
                 try:
+                    if "oeffnungszeiten" in zeile:
+                        zeitraeume = _oeffnungszeiten_dekodieren(zeile["oeffnungszeiten"])
+                    else:
+                        # Ältere Dateien mit genau einem Zeitraum pro Tag
+                        von, bis = zeile.get("oeffnung_von", ""), zeile.get("oeffnung_bis", "")
+                        zeitraeume = [(von, bis)] if von and bis else []
+
                     datensatz = Tagesdatensatz(
                         datum=parse_datum(zeile["datum"]),
                         besucher=int(zeile["besucher"]),
                         wassertemperatur=float(zeile["wassertemperatur"]),
                         lufttemperatur=float(zeile["lufttemperatur"]),
                         einnahmen=float(zeile["einnahmen"]),
-                        oeffnung_von=zeile["oeffnung_von"],
-                        oeffnung_bis=zeile["oeffnung_bis"],
+                        oeffnungszeiten=zeitraeume,
                     )
                 except (KeyError, ValueError):
                     # Fehlerhafte Zeile überspringen, damit ein einzelner
@@ -90,8 +114,7 @@ class DatenManager:
                         "wassertemperatur": e.wassertemperatur,
                         "lufttemperatur": e.lufttemperatur,
                         "einnahmen": e.einnahmen,
-                        "oeffnung_von": e.oeffnung_von,
-                        "oeffnung_bis": e.oeffnung_bis,
+                        "oeffnungszeiten": _oeffnungszeiten_kodieren(e.oeffnungszeiten),
                     }
                 )
 
