@@ -15,12 +15,15 @@ BaggerseeVerwaltung/
     datenhaltung.py            CSV-Persistenz, CRUD (DatenManager)
     eingabe.py                  Eingabemaske (Erfassen/Bearbeiten/Löschen)
     kalender.py                  Monatskalender-Widget
+    saison.py                     Saisonzeiträume je Jahr (Persistenz)
+    saisonansicht.py               Saisonübersicht-Widget (Erfassungsseite)
     auswertung.py                Zeitraumauswahl, Zusammenfassung, Tabs
     diagramme.py                 matplotlib-Diagrammfunktionen
-    stil.py                       Dunkles Farbschema (ttk-Style)
+    stil.py                       Dunkles Farbschema (ttk-Style) + Icon
     updater.py                    Auto-Update über GitHub Releases
     version.py                    Versionsnummer der Anwendung
   import_daten.py             Einmal-/Nachimport historischer CSV-Exporte
+  icon.ico                    Anwendungs-Icon (Fenster + .exe)
   requirements.txt
 ```
 
@@ -42,27 +45,25 @@ python main.py
 
 ```
 pip install -r requirements.txt
-pyinstaller --onefile --windowed --name BaggerseeVerwaltung main.py
+pyinstaller --onefile --windowed --name BaggerseeVerwaltung ^
+    --icon=icon.ico --add-data "icon.ico;." ^
+    --collect-all matplotlib --collect-all mplcursors ^
+    main.py
 ```
 
 - `--onefile` erzeugt eine einzelne .exe-Datei.
 - `--windowed` unterdrückt das Konsolenfenster (reine GUI-Anwendung).
+- `--icon` setzt das Datei-/Taskleisten-Icon der .exe, `--add-data` bündelt
+  `icon.ico` zusätzlich mit, damit die Anwendung es zur Laufzeit auch als
+  Fenster-Icon setzen kann (siehe `stil.fenstericon_setzen`).
+- `--collect-all matplotlib` und `--collect-all mplcursors` stellen sicher,
+  dass PyInstaller das Tkinter-Backend und alle Zusatzdateien dieser beiden
+  Pakete findet (wird auf manchen Systemen sonst nicht automatisch erkannt).
 - Das Ergebnis liegt danach unter `dist\BaggerseeVerwaltung.exe`.
 
 Die fertige .exe legt `baggersee_daten.csv` automatisch neben sich selbst an
 – die .exe kann also z. B. auf einen USB-Stick oder in einen beliebigen
 Ordner kopiert werden, die Daten wandern mit.
-
-### Falls der Build mit einem Fehler zu matplotlib/Tkinter abbricht
-
-Auf manchen Systemen erkennt PyInstaller das Tkinter-Backend von matplotlib
-nicht automatisch. In diesem Fall hilft:
-
-```
-pyinstaller --onefile --windowed --name BaggerseeVerwaltung ^
-    --collect-all matplotlib ^
-    main.py
-```
 
 ### Empfehlung für Windows-Kompatibilität
 
@@ -84,6 +85,13 @@ Systembibliotheken der Build-Maschine).
   - Über "+ Zeitraum hinzufügen" lassen sich mehrere Öffnungszeiträume je
     Tag erfassen, z.B. bei einer Zwangspause wegen schlechten Wetters
     (10:00–14:00 und 16:00–19:00).
+  - Monat und Jahr lassen sich über Dropdowns direkt auswählen, um schneller
+    durch den Kalender zu springen, statt einzeln über ‹ / › zu blättern.
+  - Unterhalb des Kalenders zeigt die **Saisonübersicht** pro Jahr den
+    hinterlegten Saisonzeitraum (von–bis) inkl. Bearbeiten sowie die
+    Kennzahlen (Besucher gesamt, Einnahmen gesamt, Ø Wassertemperatur) für
+    genau diesen Zeitraum. Der Zeitraum wird separat je Jahr gespeichert
+    (`baggersee_saisons.csv`) und ist unabhängig von den Tagesdatensätzen.
 - **Auswertung**: Zeitraum frei wählen oder Schnellwahl nutzen
   (aktueller Monat / gesamte Saison / letztes Jahr). Die drei Unter-Reiter
   zeigen den gewählten Zeitraum im Detail, eine Monatsübersicht und eine

@@ -22,6 +22,8 @@ from .modelle import (
     erstelle_tagesdatensatz,
     formatiere_datum,
 )
+from .saison import SaisonManager
+from .saisonansicht import SaisonAnsicht
 
 
 def _formatiere_zahl(wert: float) -> str:
@@ -33,6 +35,7 @@ class EingabeFrame(ttk.Frame):
     def __init__(self, parent: tk.Widget, datenmanager: DatenManager):
         super().__init__(parent, padding=10)
         self.datenmanager = datenmanager
+        self.saisonmanager = SaisonManager()
         self.bearbeiteter_tag: Optional[date] = None  # None => neuer Eintrag
 
         self._aufbauen()
@@ -57,7 +60,13 @@ class EingabeFrame(ttk.Frame):
             fg=stil.VORDERGRUND, font=stil.SCHRIFT_TITEL,
         ).pack(anchor="w", padx=4, pady=(0, 6))
 
-        self.kalender = MonatsKalender(rahmen, self.datenmanager, self._tag_ausgewaehlt)
+        # Wird bereits hier erzeugt (aber erst weiter unten gepackt), weil
+        # der Kalender beim Aufbau sofort den Callback unten auslöst.
+        self.saison_ansicht = SaisonAnsicht(rahmen, self.datenmanager, self.saisonmanager)
+
+        self.kalender = MonatsKalender(
+            rahmen, self.datenmanager, self._tag_ausgewaehlt, self._kalender_ansicht_geaendert
+        )
         self.kalender.pack()
 
         legende = tk.Frame(rahmen, bg=stil.HINTERGRUND)
@@ -75,6 +84,15 @@ class EingabeFrame(ttk.Frame):
             tk.Label(
                 eintrag, text=f" {text}", bg=stil.HINTERGRUND, fg=stil.GEDIMMT, font=("Segoe UI", 8)
             ).pack(side="left")
+
+        trenner = ttk.Separator(rahmen, orient="horizontal")
+        trenner.pack(fill="x", pady=10)
+
+        self.saison_ansicht.pack(fill="x", padx=4)
+
+    def _kalender_ansicht_geaendert(self, jahr: int, _monat: int) -> None:
+        if self.saison_ansicht.jahr != jahr:
+            self.saison_ansicht.jahr_anzeigen(jahr)
 
     def _formular_aufbauen(self) -> None:
         rahmen = ttk.LabelFrame(self, text="Tagesdatensatz", padding=8)
@@ -235,6 +253,7 @@ class EingabeFrame(ttk.Frame):
             return
 
         self.kalender.zu_monat_springen(datensatz.datum)
+        self.saison_ansicht.aktualisieren()
         self.formular_leeren()
         messagebox.showinfo("Gespeichert", f"Eintrag für {formatiere_datum(datensatz.datum)} gespeichert.")
 
@@ -251,4 +270,5 @@ class EingabeFrame(ttk.Frame):
             return
         self.datenmanager.loeschen(d)
         self.kalender.aktualisieren()
+        self.saison_ansicht.aktualisieren()
         self.formular_leeren()

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import sys
 import tkinter as tk
+from pathlib import Path
 from tkinter import ttk
 
 # ---------- Farbpalette ----------
@@ -79,6 +80,28 @@ def anwenden(root: tk.Tk) -> None:
         fieldbackground=[("focus", PANEL_HELL)],
         bordercolor=[("focus", AKZENT)],
     )
+
+    style.configure(
+        "TCombobox",
+        fieldbackground=PANEL,
+        background=PANEL_HELL,
+        foreground=VORDERGRUND,
+        arrowcolor=VORDERGRUND,
+        bordercolor=RAHMEN,
+        padding=4,
+    )
+    style.map(
+        "TCombobox",
+        fieldbackground=[("readonly", PANEL)],
+        foreground=[("readonly", VORDERGRUND)],
+        background=[("active", AKZENT)],
+    )
+    # Die Dropdown-Liste einer Combobox ist ein eigenes Tk-Listbox-Widget,
+    # das ttk.Style nicht erreicht – daher über die Options-Datenbank.
+    root.option_add("*TCombobox*Listbox.background", PANEL)
+    root.option_add("*TCombobox*Listbox.foreground", VORDERGRUND)
+    root.option_add("*TCombobox*Listbox.selectBackground", AKZENT)
+    root.option_add("*TCombobox*Listbox.selectForeground", "white")
 
     style.configure(
         "TNotebook", background=HINTERGRUND, bordercolor=HINTERGRUND, tabmargins=(4, 6, 4, 0)
@@ -169,3 +192,22 @@ def dunkle_toolbar(toolbar: tk.Widget) -> None:
             continue
         if isinstance(kind, tk.Label):
             kind.configure(fg=SEKUNDAER)
+
+
+def ressourcen_pfad(dateiname: str) -> Path:
+    """Pfad zu einer mit der Anwendung gebündelten Ressource (z.B. Icon).
+
+    Funktioniert sowohl beim Start aus dem Quellcode als auch in der mit
+    PyInstaller gebauten .exe (dort liegen Ressourcen im Entpackordner
+    sys._MEIPASS statt neben dem Skript).
+    """
+    basis = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
+    return basis / dateiname
+
+
+def fenstericon_setzen(root: tk.Tk) -> None:
+    """Setzt das Fenster-/Taskleisten-Icon, falls icon.ico vorhanden ist."""
+    try:
+        root.iconbitmap(str(ressourcen_pfad("icon.ico")))
+    except tk.TclError:
+        pass

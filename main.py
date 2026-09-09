@@ -25,9 +25,10 @@ class BaggerseeApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Baggersee-Verwaltung")
-        self.geometry("1150x750")
-        self.minsize(950, 650)
+        self.geometry("1200x800")
+        self.minsize(1000, 720)
         stil.anwenden(self)
+        stil.fenstericon_setzen(self)
 
         self.datenmanager = DatenManager()
 

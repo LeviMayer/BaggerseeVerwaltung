@@ -11,6 +11,7 @@ from __future__ import annotations
 import calendar
 import tkinter as tk
 from datetime import date, timedelta
+from tkinter import ttk
 from typing import Callable, Optional
 
 from . import stil
@@ -44,10 +45,12 @@ class MonatsKalender(tk.Frame):
         parent: tk.Widget,
         datenmanager: DatenManager,
         on_tag_ausgewaehlt: Callable[[date], None],
+        on_ansicht_geaendert: Optional[Callable[[int, int], None]] = None,
     ):
         super().__init__(parent, bg=self.HINTERGRUND)
         self.datenmanager = datenmanager
         self.on_tag_ausgewaehlt = on_tag_ausgewaehlt
+        self.on_ansicht_geaendert = on_ansicht_geaendert
 
         heute = date.today()
         self.jahr = heute.year
@@ -61,31 +64,53 @@ class MonatsKalender(tk.Frame):
         self._raster_aufbauen()
         self.aktualisieren()
 
+    # ---------- Hilfsfunktionen ----------
+
+    def _jahresbereich(self) -> list[int]:
+        """Jahre für die Jahresauswahl: alle Jahre mit Daten, plus etwas Rand."""
+        jahre_in_daten = {e.datum.year for e in self.datenmanager.alle_eintraege()}
+        heute_jahr = date.today().year
+        jahr_min = min(jahre_in_daten, default=heute_jahr) - 1
+        jahr_max = max(jahre_in_daten, default=heute_jahr) + 3
+        jahr_min = min(jahr_min, heute_jahr)
+        return list(range(jahr_min, jahr_max + 1))
+
     # ---------- Aufbau ----------
 
     def _kopf_aufbauen(self) -> None:
         kopf = tk.Frame(self, bg=self.HINTERGRUND)
         kopf.pack(fill="x", pady=(0, 6))
-        kopf.columnconfigure(1, weight=1)
+        kopf.columnconfigure(0, weight=1)
+        kopf.columnconfigure(3, weight=1)
 
         zurueck = tk.Label(
             kopf, text="‹", bg=self.HINTERGRUND, fg=self.VORDERGRUND,
             font=("Segoe UI", 14), cursor="hand2",
         )
-        zurueck.grid(row=0, column=0, padx=6)
+        zurueck.grid(row=0, column=0, sticky="e", padx=6)
         zurueck.bind("<Button-1>", lambda _e: self._monat_wechseln(-1))
 
-        self.titel_label = tk.Label(
-            kopf, text="", bg=self.HINTERGRUND, fg=self.VORDERGRUND,
-            font=("Segoe UI", 12, "bold"), anchor="center",
+        self.monat_var = tk.StringVar()
+        monat_auswahl = ttk.Combobox(
+            kopf, textvariable=self.monat_var, values=MONATSNAMEN,
+            width=10, state="readonly", font=("Segoe UI", 10, "bold"),
         )
-        self.titel_label.grid(row=0, column=1, sticky="ew")
+        monat_auswahl.grid(row=0, column=1, padx=(0, 4))
+        monat_auswahl.bind("<<ComboboxSelected>>", self._auswahl_geaendert)
+
+        self.jahr_var = tk.StringVar()
+        self.jahr_auswahl = ttk.Combobox(
+            kopf, textvariable=self.jahr_var, width=6,
+            state="readonly", font=("Segoe UI", 10, "bold"),
+        )
+        self.jahr_auswahl.grid(row=0, column=2, padx=(4, 0))
+        self.jahr_auswahl.bind("<<ComboboxSelected>>", self._auswahl_geaendert)
 
         vor = tk.Label(
             kopf, text="›", bg=self.HINTERGRUND, fg=self.VORDERGRUND,
             font=("Segoe UI", 14), cursor="hand2",
         )
-        vor.grid(row=0, column=2, padx=6)
+        vor.grid(row=0, column=3, sticky="w", padx=6)
         vor.bind("<Button-1>", lambda _e: self._monat_wechseln(1))
 
     def _wochentage_aufbauen(self) -> None:
@@ -125,12 +150,18 @@ class MonatsKalender(tk.Frame):
 
     def aktualisieren(self) -> None:
         """Zeichnet den aktuell gewählten Monat neu (z.B. nach Datenänderung)."""
-        self.titel_label.config(text=f"{MONATSNAMEN[self.monat - 1]} {self.jahr}")
+        self.jahr_auswahl.configure(values=[str(j) for j in self._jahresbereich()])
+        self.monat_var.set(MONATSNAMEN[self.monat - 1])
+        self.jahr_var.set(str(self.jahr))
+
         self.tage = self._wochen_holen()
         heute = date.today()
         for r, woche in enumerate(self.tage):
             for c, tag in enumerate(woche):
                 self._zelle_zeichnen(r, c, tag, heute)
+
+        if self.on_ansicht_geaendert is not None:
+            self.on_ansicht_geaendert(self.jahr, self.monat)
 
     def _zelle_zeichnen(self, r: int, c: int, tag: date, heute: date) -> None:
         canvas = self.zellen[r][c]
@@ -175,6 +206,15 @@ class MonatsKalender(tk.Frame):
             self.jahr, self.monat = tag.year, tag.month
             self.aktualisieren()
         self.on_tag_ausgewaehlt(tag)
+
+    def _auswahl_geaendert(self, _event=None) -> None:
+        """Reagiert auf die Monats-/Jahresauswahl über die Dropdowns."""
+        try:
+            self.monat = MONATSNAMEN.index(self.monat_var.get()) + 1
+            self.jahr = int(self.jahr_var.get())
+        except (ValueError, IndexError):
+            return
+        self.aktualisieren()
 
     def _monat_wechseln(self, delta: int) -> None:
         monatsindex = self.monat - 1 + delta
