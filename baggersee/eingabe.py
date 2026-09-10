@@ -32,10 +32,10 @@ def _formatiere_zahl(wert: float) -> str:
 
 
 class EingabeFrame(ttk.Frame):
-    def __init__(self, parent: tk.Widget, datenmanager: DatenManager):
+    def __init__(self, parent: tk.Widget, datenmanager: DatenManager, saisonmanager: SaisonManager):
         super().__init__(parent, padding=10)
         self.datenmanager = datenmanager
-        self.saisonmanager = SaisonManager()
+        self.saisonmanager = saisonmanager
         self.bearbeiteter_tag: Optional[date] = None  # None => neuer Eintrag
 
         self._aufbauen()

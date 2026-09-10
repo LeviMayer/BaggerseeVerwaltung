@@ -29,6 +29,7 @@ class UpdateInfo:
     version: str
     download_url: str
     notizen: str
+    groesse: int
 
 
 def _version_tuple(text: str) -> tuple[int, ...]:
@@ -71,6 +72,7 @@ def neueste_version_pruefen() -> Optional[UpdateInfo]:
         version=tag.lstrip("vV"),
         download_url=exe_asset["browser_download_url"],
         notizen=daten.get("body", "") or "",
+        groesse=exe_asset.get("size", 0),
     )
 
 
@@ -90,21 +92,40 @@ def update_installieren(info: UpdateInfo) -> None:
 
     aktuelle_exe = Path(sys.executable)
     temp_verzeichnis = Path(tempfile.gettempdir())
+    # Erst unter .part herunterladen, damit nie eine unvollständige Datei
+    # unter dem finalen Namen liegt, falls der Download abbricht.
+    download_teil = temp_verzeichnis / f"BaggerseeVerwaltung_{info.version}.exe.part"
     neue_exe = temp_verzeichnis / f"BaggerseeVerwaltung_{info.version}.exe"
 
     with urllib.request.urlopen(info.download_url, timeout=60) as antwort:
-        neue_exe.write_bytes(antwort.read())
+        daten = antwort.read()
+
+    if info.groesse and len(daten) != info.groesse:
+        raise RuntimeError(
+            f"Download unvollständig ({len(daten)} von {info.groesse} Bytes). "
+            "Bitte erneut versuchen."
+        )
+    download_teil.write_bytes(daten)
+    download_teil.replace(neue_exe)
 
     update_skript = temp_verzeichnis / "baggersee_update.bat"
     update_skript.write_text(
         "@echo off\r\n"
+        "set versuche=0\r\n"
         ":warten\r\n"
         f'move /y "{neue_exe}" "{aktuelle_exe}" >nul 2>&1\r\n'
         "if errorlevel 1 (\r\n"
+        "    set /a versuche+=1\r\n"
+        "    if %versuche% geq 30 goto ende\r\n"
         "    timeout /t 1 /nobreak >nul\r\n"
         "    goto warten\r\n"
         ")\r\n"
+        # Kurze Pause, damit z.B. der Virenschutz die frisch geschriebene
+        # .exe fertig prüfen kann, bevor sie gestartet wird (sonst kann
+        # das ansonsten kryptische "Failed to load Python DLL" auftreten).
+        "timeout /t 2 /nobreak >nul\r\n"
         f'start "" "{aktuelle_exe}"\r\n'
+        ":ende\r\n"
         'del "%~f0"\r\n',
         encoding="utf-8",
     )

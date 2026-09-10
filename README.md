@@ -92,12 +92,24 @@ Systembibliotheken der Build-Maschine).
     Kennzahlen (Besucher gesamt, Einnahmen gesamt, Ø Wassertemperatur) für
     genau diesen Zeitraum. Der Zeitraum wird separat je Jahr gespeichert
     (`baggersee_saisons.csv`) und ist unabhängig von den Tagesdatensätzen.
-- **Auswertung**: Zeitraum frei wählen oder Schnellwahl nutzen
-  (aktueller Monat / gesamte Saison / letztes Jahr). Die drei Unter-Reiter
-  zeigen den gewählten Zeitraum im Detail, eine Monatsübersicht und eine
-  Saisonübersicht über alle gespeicherten Daten. Jedes Diagramm hat eine
-  Zoom-/Pan-Werkzeugleiste und zeigt beim Überfahren mit der Maus den
-  genauen Wert als Tooltip an.
+- **Auswertung**: ein einzelnes Vergleichs-Diagramm, gesteuert über Checkboxen/
+  Auswahlfelder:
+  - **Zeiträume**: der Gesamtzeitraum über alle Daten, oder einzelne
+    hinterlegte Saisons. Mehrere Zeiträume gleichzeitig überlagern eine
+    Kennzahl zum Vergleich (X-Achse = Tag/Monat der Saison, damit
+    unterschiedliche Startdaten nicht stören).
+  - **Werte**: welche Kennzahl(en) angezeigt werden – bei einem einzelnen
+    Zeitraum auch mehrere gleichzeitig (dann auf 0–100 % normiert, Tooltip
+    zeigt trotzdem den echten Wert). Bei mehreren Zeiträumen ist nur eine
+    Kennzahl gleichzeitig möglich (und umgekehrt).
+  - **Gruppierung**: Tag / Monat / Jahr – fasst die Werte entsprechend
+    zusammen (ersetzt die früheren separaten Tabs "Monatsübersicht" und
+    "Saisonübersicht").
+  - **Diagrammtyp**: Linie oder Balken – Balken helfen, wenn sich Linien
+    mehrerer überlagerter Zeiträume gegenseitig verdecken.
+
+  Das Diagramm hat außerdem eine Zoom-/Pan-Werkzeugleiste und zeigt beim
+  Überfahren mit der Maus den genauen Wert als Tooltip an.
 
 ## Automatisches Update
 

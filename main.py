@@ -18,6 +18,7 @@ from baggersee import stil, updater
 from baggersee.auswertung import AuswertungFrame
 from baggersee.datenhaltung import DatenManager
 from baggersee.eingabe import EingabeFrame
+from baggersee.saison import SaisonManager
 from baggersee.version import VERSION
 
 
@@ -31,6 +32,7 @@ class BaggerseeApp(tk.Tk):
         stil.fenstericon_setzen(self)
 
         self.datenmanager = DatenManager()
+        self.saisonmanager = SaisonManager()
 
         # Statusleiste zuerst packen (side="bottom"), damit ihr die volle
         # Breite unten reserviert bleibt, bevor das Notebook mit
@@ -40,8 +42,8 @@ class BaggerseeApp(tk.Tk):
         notebook = ttk.Notebook(self)
         notebook.pack(fill="both", expand=True)
 
-        self.eingabe_frame = EingabeFrame(notebook, self.datenmanager)
-        self.auswertung_frame = AuswertungFrame(notebook, self.datenmanager)
+        self.eingabe_frame = EingabeFrame(notebook, self.datenmanager, self.saisonmanager)
+        self.auswertung_frame = AuswertungFrame(notebook, self.datenmanager, self.saisonmanager)
 
         notebook.add(self.eingabe_frame, text="Erfassung")
         notebook.add(self.auswertung_frame, text="Auswertung")

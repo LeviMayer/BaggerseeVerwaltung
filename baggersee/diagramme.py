@@ -1,15 +1,16 @@
 """
-Diagrammfunktionen für die Auswertung.
+Diagrammfunktion für die Auswertung: ein einzelnes Vergleichs-Diagramm.
 
-Jede Funktion zeichnet auf einer übergebenen matplotlib-Achse; die Einbettung
-in Tkinter erfolgt in auswertung.py über FigureCanvasTkAgg.
+Die Einbettung in Tkinter erfolgt in auswertung.py über FigureCanvasTkAgg;
+auswertung.py stellt auch die eigentlichen Kennzahlen zusammen (Auswahl,
+Gruppierung nach Tag/Monat/Jahr, ggf. Normierung) und übergibt sie hier
+fertig aufbereitet als Liste von ChartReihe.
 """
 
 from __future__ import annotations
 
 import math
-from collections import defaultdict
-from typing import Iterable
+from dataclasses import dataclass
 
 import mplcursors
 
@@ -25,6 +26,52 @@ FARBE_BESUCHER = stil.AKZENT
 FARBE_WASSER = stil.INFO
 FARBE_LUFT = stil.WARNUNG
 FARBE_EINNAHMEN = stil.ERFOLG
+
+# Kennzahlen, die im Vergleichs-Diagramm wählbar sind.
+METRIK_LABEL = {
+    "besucher": "Besucher",
+    "wasser": "Wassertemperatur",
+    "luft": "Lufttemperatur",
+    "einnahmen": "Einnahmen",
+}
+METRIK_EINHEIT = {"besucher": "", "wasser": "°C", "luft": "°C", "einnahmen": "€"}
+METRIK_FARBE = {
+    "besucher": FARBE_BESUCHER, "wasser": FARBE_WASSER,
+    "luft": FARBE_LUFT, "einnahmen": FARBE_EINNAHMEN,
+}
+# Rotierende Farben für mehrere überlagerte Zeiträume (eine Kennzahl, viele Saisons).
+ZEITRAUM_FARBEN = [stil.AKZENT, stil.ERFOLG, stil.WARNUNG, stil.INFO, stil.GELB, stil.FEHLER]
+
+
+def wert_fuer_metrik(e: Tagesdatensatz, metrik: str) -> float:
+    """Liest den Wert einer Kennzahl aus einem Tagesdatensatz."""
+    if metrik == "besucher":
+        return e.besucher
+    if metrik == "wasser":
+        return e.wassertemperatur
+    if metrik == "luft":
+        return e.lufttemperatur
+    if metrik == "einnahmen":
+        return e.einnahmen
+    raise ValueError(f"Unbekannte Kennzahl: {metrik}")
+
+
+@dataclass
+class ChartReihe:
+    """Eine Linie/Balkengruppe im Vergleichs-Diagramm.
+
+    `x` ist je nach x_typ (siehe zeichne_vergleich) ein Datum, eine Zahl
+    (Tag der Saison) oder eine bereits fertige Kategorie-Beschriftung
+    (Monat/Jahr-Gruppierung) – über alle Reihen eines Diagramms hinweg
+    einheitlich und gleich lang (fehlende Kategorien = NaN).
+    """
+
+    label: str
+    x: list
+    y: list  # ggf. normierte Werte (0-100), die tatsächlich gezeichnet werden
+    y_original: list  # echte Werte, für den Hover-Tooltip
+    farbe: str
+    einheit: str
 
 
 def _dunkle_achse(ax, achse: str = "both") -> None:
@@ -68,158 +115,95 @@ def _cursor_setzen(ax, artists, formatter) -> None:
     ax._baggersee_cursor = cursor
 
 
-def zeichne_besucherverlauf(ax, eintraege: Iterable[Tagesdatensatz]) -> None:
-    eintraege = list(eintraege)
+def _wert_text(wert, einheit: str) -> str:
+    if isinstance(wert, float) and math.isnan(wert):
+        return "unbekannt"
+    if einheit == "€":
+        return f"{wert:.2f} €"
+    if einheit == "°C":
+        return f"{wert:.1f} °C"
+    return str(wert)
+
+
+def zeichne_vergleich(
+    ax, reihen: list[ChartReihe], x_typ: str, normiert: bool, diagrammtyp: str = "linie",
+) -> None:
+    """
+    Zeichnet das Vergleichs-Diagramm mit einer oder mehreren Reihen.
+
+    `x_typ` steuert, wie die x-Achse zu lesen und zu beschriften ist:
+    - "datum": echtes Kalenderdatum (ein einzelner Zeitraum, Gruppierung "Tag")
+    - "zahl": Tag der Saison (mehrere überlagerte Zeiträume, Gruppierung "Tag")
+    - "kategorie": fertige Beschriftungen wie "Mai 2026" oder "2026"
+      (Gruppierung "Monat"/"Jahr", von auswertung.py bereits aufbereitet)
+
+    `diagrammtyp` ist "linie" oder "balken". Bei "balken" werden alle
+    Reihen als gruppierte Balken nebeneinander gezeichnet (hilfreich, wenn
+    sich Linien mehrerer Saisons sonst gegenseitig überlagern).
+    """
     ax.clear()
-    if not eintraege:
-        _leerer_hinweis(ax, "Keine Daten im gewählten Zeitraum")
+    if not reihen:
+        _leerer_hinweis(ax, "Keine Daten für die aktuelle Auswahl.")
         return
-    x = [e.datum for e in eintraege]
-    y = [e.besucher for e in eintraege]
-    linie = ax.plot(x, y, marker="o", color=FARBE_BESUCHER)[0]
-    ax.set_title("Besucherverlauf")
-    ax.set_ylabel("Besucher")
-    ax.tick_params(axis="x", rotation=45)
+
+    kategorisch = x_typ in ("kategorie", "zahl") if diagrammtyp == "balken" else x_typ == "kategorie"
+    kunst: list[tuple[object, ChartReihe]] = []
+
+    if diagrammtyp == "balken":
+        positionen_basis = list(range(len(reihen[0].x)))
+        anzahl = len(reihen)
+        breite = 0.8 / max(anzahl, 1)
+        for i, reihe in enumerate(reihen):
+            positionen = [p + (i - (anzahl - 1) / 2) * breite for p in positionen_basis]
+            balken = ax.bar(positionen, reihe.y, width=breite, color=reihe.farbe, label=reihe.label)
+            kunst.append((balken, reihe))
+        beschriftungen = [
+            v if x_typ == "kategorie" else (formatiere_datum(v) if x_typ == "datum" else str(v))
+            for v in reihen[0].x
+        ]
+        ax.set_xticks(positionen_basis)
+        ax.set_xticklabels(beschriftungen, rotation=45, ha="right", fontsize=7)
+    else:
+        for reihe in reihen:
+            if kategorisch:
+                x_werte = list(range(len(reihe.x)))
+            else:
+                x_werte = reihe.x
+            linie = ax.plot(x_werte, reihe.y, marker="o", markersize=3, color=reihe.farbe, label=reihe.label)[0]
+            kunst.append((linie, reihe))
+        if kategorisch:
+            ax.set_xticks(list(range(len(reihen[0].x))))
+            ax.set_xticklabels(reihen[0].x, rotation=45, ha="right", fontsize=7)
+
+    ax.set_title("Vergleich")
+    if normiert:
+        ax.set_ylabel("% vom Maximum im Zeitraum")
+    else:
+        einheit = reihen[0].einheit
+        ax.set_ylabel(einheit if einheit else "Anzahl")
+
+    if x_typ == "datum" and diagrammtyp == "linie":
+        ax.tick_params(axis="x", rotation=45)
+    elif x_typ == "zahl" and diagrammtyp == "linie":
+        ax.set_xlabel("Tag der Saison")
+
     _dunkle_achse(ax)
-    _cursor_setzen(
-        ax, [linie],
-        lambda sel: f"{formatiere_datum(eintraege[int(sel.index)].datum)}\n{eintraege[int(sel.index)].besucher} Besucher",
-    )
+    if len(reihen) > 1:
+        ax.legend(loc="best", fontsize=8, facecolor=stil.PANEL, edgecolor=stil.RAHMEN, labelcolor=stil.VORDERGRUND)
 
+    def _tooltip(sel):
+        for artefakt, reihe in kunst:
+            if sel.artist is not artefakt:
+                continue
+            idx = int(sel.index)
+            wert_text = _wert_text(reihe.y_original[idx], reihe.einheit)
+            if x_typ == "kategorie":
+                x_text = str(reihe.x[idx])
+            elif x_typ == "datum":
+                x_text = formatiere_datum(reihe.x[idx])
+            else:
+                x_text = f"Tag {reihe.x[idx]}"
+            return f"{reihe.label}\n{x_text}: {wert_text}"
+        return ""
 
-def zeichne_temperaturverlauf(ax, eintraege: Iterable[Tagesdatensatz]) -> None:
-    eintraege = list(eintraege)
-    ax.clear()
-    if not eintraege:
-        _leerer_hinweis(ax, "Keine Daten im gewählten Zeitraum")
-        return
-    x = [e.datum for e in eintraege]
-    wasser = [e.wassertemperatur for e in eintraege]
-    luft = [e.lufttemperatur for e in eintraege]
-    linie_wasser = ax.plot(x, wasser, marker="o", color=FARBE_WASSER, label="Wassertemperatur")[0]
-    linie_luft = ax.plot(x, luft, marker="o", color=FARBE_LUFT, label="Lufttemperatur")[0]
-    ax.set_title("Wasser- und Lufttemperatur")
-    ax.set_ylabel("°C")
-    ax.tick_params(axis="x", rotation=45)
-    _dunkle_achse(ax)
-    ax.legend(loc="best", fontsize=8, facecolor=stil.PANEL, edgecolor=stil.RAHMEN, labelcolor=stil.VORDERGRUND)
-
-    def _temperatur_tooltip(sel):
-        e = eintraege[int(sel.index)]
-        if sel.artist is linie_wasser:
-            bezeichnung, wert = "Wassertemperatur", e.wassertemperatur
-        else:
-            bezeichnung, wert = "Lufttemperatur", e.lufttemperatur
-        wert_text = f"{wert:.1f} °C" if not math.isnan(wert) else "unbekannt"
-        return f"{formatiere_datum(e.datum)}\n{bezeichnung}: {wert_text}"
-
-    _cursor_setzen(ax, [linie_wasser, linie_luft], _temperatur_tooltip)
-
-
-def zeichne_einnahmenverlauf(ax, eintraege: Iterable[Tagesdatensatz]) -> None:
-    eintraege = list(eintraege)
-    ax.clear()
-    if not eintraege:
-        _leerer_hinweis(ax, "Keine Daten im gewählten Zeitraum")
-        return
-    x = [e.datum for e in eintraege]
-    y = [e.einnahmen for e in eintraege]
-    balken = ax.bar(x, y, color=FARBE_EINNAHMEN, width=0.8)
-    ax.set_title("Einnahmen")
-    ax.set_ylabel("€")
-    ax.tick_params(axis="x", rotation=45)
-    _dunkle_achse(ax, achse="y")
-
-    def _einnahmen_tooltip(sel):
-        e = eintraege[int(sel.index)]
-        wert_text = f"{e.einnahmen:.2f} €" if not math.isnan(e.einnahmen) else "unbekannt"
-        return f"{formatiere_datum(e.datum)}\n{wert_text}"
-
-    _cursor_setzen(ax, [balken], _einnahmen_tooltip)
-
-
-def _monatsschluessel(e: Tagesdatensatz) -> tuple[int, int]:
-    return (e.datum.year, e.datum.month)
-
-
-def zeichne_monatsuebersicht(ax_besucher, ax_einnahmen, eintraege: Iterable[Tagesdatensatz]) -> None:
-    """Zeichnet zwei Balkendiagramme (Besucher, Einnahmen) je Kalendermonat."""
-    eintraege = sorted(eintraege, key=lambda e: e.datum)
-    ax_besucher.clear()
-    ax_einnahmen.clear()
-    if not eintraege:
-        _leerer_hinweis(ax_besucher, "Keine Daten im gewählten Zeitraum")
-        _leerer_hinweis(ax_einnahmen, "Keine Daten im gewählten Zeitraum")
-        return
-
-    monats_besucher: dict[tuple[int, int], int] = defaultdict(int)
-    monats_einnahmen: dict[tuple[int, int], float] = defaultdict(float)
-    for e in eintraege:
-        schluessel = _monatsschluessel(e)
-        monats_besucher[schluessel] += e.besucher
-        monats_einnahmen[schluessel] += 0.0 if math.isnan(e.einnahmen) else e.einnahmen
-
-    schluessel_sortiert = sorted(monats_besucher.keys())
-    beschriftungen = [f"{MONATSNAMEN[m - 1]} {j}" for (j, m) in schluessel_sortiert]
-    werte_besucher = [monats_besucher[k] for k in schluessel_sortiert]
-    werte_einnahmen = [monats_einnahmen[k] for k in schluessel_sortiert]
-
-    balken_besucher = ax_besucher.bar(beschriftungen, werte_besucher, color=FARBE_BESUCHER)
-    ax_besucher.set_title("Besucher pro Monat")
-    ax_besucher.set_ylabel("Besucher")
-    ax_besucher.tick_params(axis="x", rotation=45)
-    _dunkle_achse(ax_besucher, achse="y")
-    _cursor_setzen(
-        ax_besucher, [balken_besucher],
-        lambda sel: f"{beschriftungen[int(sel.index)]}\n{werte_besucher[int(sel.index)]} Besucher",
-    )
-
-    balken_einnahmen = ax_einnahmen.bar(beschriftungen, werte_einnahmen, color=FARBE_EINNAHMEN)
-    ax_einnahmen.set_title("Einnahmen pro Monat")
-    ax_einnahmen.set_ylabel("€")
-    ax_einnahmen.tick_params(axis="x", rotation=45)
-    _dunkle_achse(ax_einnahmen, achse="y")
-    _cursor_setzen(
-        ax_einnahmen, [balken_einnahmen],
-        lambda sel: f"{beschriftungen[int(sel.index)]}\n{werte_einnahmen[int(sel.index)]:.2f} €",
-    )
-
-
-def zeichne_saisonuebersicht(ax_besucher, ax_einnahmen, eintraege: Iterable[Tagesdatensatz]) -> None:
-    """Zeichnet zwei Balkendiagramme (Besucher, Einnahmen) je Saison (Kalenderjahr)."""
-    eintraege = sorted(eintraege, key=lambda e: e.datum)
-    ax_besucher.clear()
-    ax_einnahmen.clear()
-    if not eintraege:
-        _leerer_hinweis(ax_besucher, "Keine Daten vorhanden")
-        _leerer_hinweis(ax_einnahmen, "Keine Daten vorhanden")
-        return
-
-    saison_besucher: dict[int, int] = defaultdict(int)
-    saison_einnahmen: dict[int, float] = defaultdict(float)
-    for e in eintraege:
-        saison_besucher[e.datum.year] += e.besucher
-        saison_einnahmen[e.datum.year] += 0.0 if math.isnan(e.einnahmen) else e.einnahmen
-
-    jahre = sorted(saison_besucher.keys())
-    beschriftungen = [str(j) for j in jahre]
-    werte_besucher = [saison_besucher[j] for j in jahre]
-    werte_einnahmen = [saison_einnahmen[j] for j in jahre]
-
-    balken_besucher = ax_besucher.bar(beschriftungen, werte_besucher, color=FARBE_BESUCHER)
-    ax_besucher.set_title("Besucher pro Saison")
-    ax_besucher.set_ylabel("Besucher")
-    _dunkle_achse(ax_besucher, achse="y")
-    _cursor_setzen(
-        ax_besucher, [balken_besucher],
-        lambda sel: f"{beschriftungen[int(sel.index)]}\n{werte_besucher[int(sel.index)]} Besucher",
-    )
-
-    balken_einnahmen = ax_einnahmen.bar(beschriftungen, werte_einnahmen, color=FARBE_EINNAHMEN)
-    ax_einnahmen.set_title("Einnahmen pro Saison")
-    ax_einnahmen.set_ylabel("€")
-    _dunkle_achse(ax_einnahmen, achse="y")
-    _cursor_setzen(
-        ax_einnahmen, [balken_einnahmen],
-        lambda sel: f"{beschriftungen[int(sel.index)]}\n{werte_einnahmen[int(sel.index)]:.2f} €",
-    )
+    _cursor_setzen(ax, [k for k, _ in kunst], _tooltip)

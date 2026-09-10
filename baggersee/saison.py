@@ -67,6 +67,10 @@ class SaisonManager:
     def fuer_jahr(self, jahr: int) -> Optional[Saisonzeitraum]:
         return self._zeitraeume.get(jahr)
 
+    def alle(self) -> list[Saisonzeitraum]:
+        """Liefert alle hinterlegten Saisonzeiträume, sortiert nach Jahr."""
+        return [self._zeitraeume[jahr] for jahr in sorted(self._zeitraeume)]
+
     def speichern(self, zeitraum: Saisonzeitraum) -> None:
         self._zeitraeume[zeitraum.jahr] = zeitraum
         self._schreiben()
